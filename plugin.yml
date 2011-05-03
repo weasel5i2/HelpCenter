@@ -1,0 +1,8 @@
+name: HelpCenter
+main: net.weasel.HelpCenter.HelpCenter
+version: 1.72
+commands:
+  help:
+    description:
+    usage:
+    aliases: "?"
