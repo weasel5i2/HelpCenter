@@ -377,7 +377,7 @@ public class HelpCenter extends JavaPlugin {
         }
     }
     public static String doPermissionsStringReplacements(Player who, String HelpString) {
-        String player = who.getName();
+        String player = who.getName().replace(" ", "").replace("/", "").replace(".", "");
         String groups = "groups";
         String group = "prigroup";
         if (HelpCenter.Permissions != null) {
