@@ -1,5 +1,27 @@
 Changelog:
 
+Version 1.72c 27-Apr-2011
+
+    * Added support for subdirectories in the plugin/HelpCenter config folder
+    * When searching for files, it searches in the followign order
+        with a .txt
+        without a .txt
+        replacing spaces with "/" and with a .txt
+        replacing spaces with "/" and without a .txt
+        
+        Example: /help ScrapBukkit clear
+            "plugin/HelpCenter/scrapbukkit clear.txt"
+            "plugin/HelpCenter/scrapbukkit clear"
+            "plugin/HelpCenter/scrapbukkit/clear.txt"
+            "plugin/HelpCenter/scrapbukkit/clear"
+    * /help BuildHelpFiles              This will scan bukkit for plugins and attempt to extract the .yml file for commands to build help files from.
+    * /help BuildPlugin <PluginName>    This will build help file from plugin .yml file for the one plugin.
+    * Added hook into Permissions to get all groups and primary groups the user belongs to. This allows for key word replacement.
+        %user%       will be the players name  ex: "TheNut"
+        %prigroup%   will be the first group returned from permissions. Ex: "Admin"
+        %groups%     will be all groups surrounded by brackets. ex: "[Admin,Derp]
+        NOTE: " ", "/", and "." will be removed from user and group names for security reasons.
+
 Version 1.72 30-Mar-2011
 
     * Recompiled against latest recommended Craftbukkit build #602.
