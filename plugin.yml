@@ -1,8 +1,17 @@
 name: HelpCenter
 main: net.weasel.HelpCenter.HelpCenter
-version: 1.72
+version: 1.72c
+authors:
+  - weasel5i2
+  - The_Nut
 commands:
   help:
     description:
     usage:
     aliases: "?"
+  buildHelpFiles:
+    description: This will build a standard set of help files for all installed plugins as based on their plugin.yml file. There are no parameters.
+    usage: /help <command>
+  buildPlugin:
+    description: This will build a standard set of help files for one installed plugin as based on it's plugin.yml file.
+    usage: /help <command> <pluginName>
