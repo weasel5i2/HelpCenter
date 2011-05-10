@@ -1,5 +1,15 @@
 Changelog:
 
+Version 1.73 10-May-2011
+    * Add Javadoc, Cleaned up additional code.
+    * Allow for HelpCenter to be used in console.
+    * Fixed buildHelpFiles and buildPlugin commands to be more robust and consistent in building help files.
+    * Added command helpp to pull help file information directly from the server's installed plugins.
+
+Version 1.72d 5-May-2011
+    * Cleaned up internal code
+    * Fixed line wrapping so it will not count chat color codes as part of the 60 char limit per line.
+
 Version 1.72c 27-Apr-2011
 
     * Added support for subdirectories in the plugin/HelpCenter config folder
