@@ -1,14 +1,17 @@
 name: HelpCenter
 main: net.weasel.HelpCenter.HelpCenter
-version: 1.72c
+version: 1.73
 authors:
   - weasel5i2
   - The_Nut
 commands:
   help:
-    description:
-    usage:
-    aliases: "?"
+    description: Display help file information.
+    usage: /<command>
+    aliases: ['?']
+  helpp:
+    description: Help from Plugins. This will get the help information directly from the installed plugins. It will not reference the physical files.
+    usage: /<command> <pluginName> <pluginCommand>
   buildHelpFiles:
     description: This will build a standard set of help files for all installed plugins as based on their plugin.yml file. There are no parameters.
     usage: /help <command>
