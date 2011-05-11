@@ -31,9 +31,16 @@ public class HelpCenter extends JavaPlugin {
     private static String pluginHelpPathNoSlash = "plugins/HelpCenter";
     private static String pluginHelpPath = pluginHelpPathNoSlash + "/";
     private static String[] Colours = { "&0", "&1", "&2", "&3", "&4", "&5", "&6", "&7", 
-                                        "&8", "&9", "&a", "&b", "&c", "&d", "&e", "&f" };
+                                        "&8", "&9", "&a", "&b", "&c", "&d", "&e", "&f",
+                                        "#!k", "#!b", "#!g", "#!c", "#!r", "#!m", "#!y", "#!w",
+                                        "#!K", "#!B", "#!G", "#!C", "#!R", "#!M", "#!Y", "#!W"                                        
+                                      };
     private static ChatColor[] cCode = {ChatColor.BLACK, ChatColor.DARK_BLUE, ChatColor.DARK_GREEN, ChatColor.DARK_AQUA, ChatColor.DARK_RED, ChatColor.DARK_PURPLE, ChatColor.GOLD, ChatColor.GRAY, 
-                                        ChatColor.DARK_GRAY, ChatColor.BLUE, ChatColor.GREEN, ChatColor.AQUA, ChatColor.RED, ChatColor.LIGHT_PURPLE, ChatColor.YELLOW, ChatColor.WHITE };
+                                        ChatColor.DARK_GRAY, ChatColor.BLUE, ChatColor.GREEN, ChatColor.AQUA, ChatColor.RED, ChatColor.LIGHT_PURPLE, ChatColor.YELLOW, ChatColor.WHITE,
+                                        ChatColor.BLACK, ChatColor.DARK_BLUE, ChatColor.DARK_GREEN, ChatColor.DARK_AQUA, ChatColor.DARK_RED, ChatColor.DARK_PURPLE, ChatColor.GOLD, ChatColor.GRAY,
+                                        ChatColor.DARK_GRAY, ChatColor.BLUE, ChatColor.GREEN, ChatColor.AQUA, ChatColor.RED, ChatColor.LIGHT_PURPLE, ChatColor.YELLOW, ChatColor.WHITE
+                                       };
+    
     private final HelpCenterListener playerListener = new HelpCenterListener(this);
     private static String TokenLineSplit = "ZQX123!";
     private static PermissionHandler Permissions;
