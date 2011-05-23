@@ -1,4 +1,23 @@
 Changelog:
+version 1.75 20-May-2011
+    * Added more key word replacements: (total list)
+      %user%              - Bukkit - player - The players name<br/>
+      %world%             - Bukkit - player - The world the player is in<br/>
+      %health%            - Bukkit - player - The players health value (0 = dead, 20 = full health)<br/>
+      %locx%              - Bukkit - player - The players location X<br/>
+      %locy%              - Bukkit - player - The players location Y<br/>
+      %locz%              - Bukkit - player - The players location Z<br/>
+      %iteminhandid%      - Bukkit - player - The ID of the item the player has in hand<br/>
+      %iteminhand%        - Bukkit - player - The item the player has in hand<br/>
+      %isop%              - Bukkit - player - Is the player an OP - "YES" or "NO"<br/>
+      %serveronlinecount% - bukkit - Number of players currently on server<br/>
+      %serverver%         - bukkit - version of the server<br/>
+      %groups%            - Plugin - Permissions - The list of groups to which the player belongs.<br/>
+      %prigroup%          - Plugin - Permissions - The first group returned by Permissions to which the player belongs.<br/>
+      %helpver%           - Plugin - HelpCenter  - Version of the plugin<br/>
+
+version 1.74 10-May 2011
+    * Added the Old style colour codes back in so it will support both.
 
 Version 1.73 10-May-2011
     * Add Javadoc, Cleaned up additional code.
