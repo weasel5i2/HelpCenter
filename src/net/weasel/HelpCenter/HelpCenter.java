@@ -12,6 +12,8 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
+
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -237,7 +239,7 @@ public class HelpCenter extends JavaPlugin {
             return ("");
 
         String GroupDirectory = doStringTokenReplacements(who, "%prigroup%/");
-        if (!new File(doStringTokenReplacements(who, pluginHelpPath + GroupDirectory)).exists())
+        if (!new File(pluginHelpPath + GroupDirectory).exists())
             GroupDirectory = "";
 
         hFile = new File(pluginHelpPath + GroupDirectory + which.toLowerCase() + ".txt");
@@ -387,6 +389,9 @@ public class HelpCenter extends JavaPlugin {
      * @throws IOException
      */
     public static String parseHelpLine(Player who, String helpLine, String topic) throws IOException {
+        //Replace tokens in line if present
+        helpLine = doStringTokenReplacements(who, helpLine);
+        
         if (helpLine.length() < 6)
             return (helpLine);
 
@@ -545,7 +550,17 @@ public class HelpCenter extends JavaPlugin {
      * Replace key tokens in the string with looked up values.<br/>
      * <br/>
      * This will replace the following tokens with the associated values.<br/> 
-     * %user% - Bukkit - The players name<br/>
+     * %user% - Bukkit - player - The players name<br/>
+     * %world% - Bukkit - player - The world the player is in<br/>
+     * %health% - Bukkit - player - The players health value (0 = dead, 20 = full health)<br/>
+     * %locx% - Bukkit - player - The players location X<br/>
+     * %locy% - Bukkit - player - The players location Y<br/>
+     * %locz% - Bukkit - player - The players location Z<br/>
+     * %iteminhandid% - Bukkit - player - The ID of the item the player has in hand<br/>
+     * %iteminhand% - Bukkit - player - The item the player has in hand<br/>
+     * %isop% - Bukkit - player - Is the player an OP - "YES" or "NO"<br/>
+     * %serveronlinecount% - bukkit - Number of players currently on server<br/>
+     * %serverver% - bukkit - version of the server<br/>
      * %groups% - Plugin - Permissions - The list of groups to which the player belongs.<br/>
      * %prigroup% - Plugin - Permissions - The first group returned by Permissions to which the player belongs.<br/>
      * %helpver% - Plugin - HelpCenter - Version of the plugin<br/>
@@ -559,27 +574,76 @@ public class HelpCenter extends JavaPlugin {
      * @param HelpString
      *            String containing the Tokens to be replaced
      * @return String with the tokens replaced.
-     */
+     */ 
     private static String doStringTokenReplacements(Player who, String HelpString) {
+        //declare replaceable variables
         String player = "user";
-        String groups = "groups";
-        String group = "prigroup";
+            String playerWorld = "world";
+            String playerHealth = "health";
+            String playerX = "locx";
+            String playerY = "locy";
+            String playerZ = "locz";
+            String playerItemInHandId = "iteminhandid";
+            String playerItemInHand = "iteminhand";
+            String playerIsOp = "isop";
+            String playerGroups = "groups";
+            String playerGroup = "prigroup";
+        String serverOnlineCount = "serveronlinecount";
+        String serverVersion = "serverver";
+        
+        //get server variables
+        serverOnlineCount = "" + Bukkit.getServer().getOnlinePlayers().length;
+        serverVersion = "" + Bukkit.getServer().getVersion().replace(" ", "");
+            //extract the build number
+            if (serverVersion.charAt(serverVersion.indexOf("(MC:")-9) == '-')
+                //the build is 3 digits long
+                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-7, serverVersion.indexOf("(MC:")-4);
+            else
+                //the build is 4 digits long (hopefully not more)
+                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-8, serverVersion.indexOf("(MC:")-5);
+                
+        //get player specific variables
         if (who != null) {
+            Location location = who.getLocation();
             player = who.getName().replace(" ", "").replace("/", "").replace(".", "");
+            playerHealth = Integer.toString(who.getHealth());
+
+            //who.getItemInHand()
+            playerWorld = location.getWorld().getName();
+            playerX = "" + Math.floor(location.getX()); 
+            playerY = "" + Math.floor(location.getY()); 
+            playerZ = "" + Math.floor(location.getZ()); 
+            playerItemInHand = who.getItemInHand().getType().name();
+            playerItemInHandId = "" + who.getItemInHand().getTypeId();
+            playerIsOp = "" + (who.isOp() ? "YES" : "NO");
+
+            //get player specific permission variables
             if (HelpCenter.Permissions != null) {
-                Location location = who.getLocation();
-                groups = HelpCenter.Permissions.getGroups(location.getWorld().getName(), player)[0].toString().replace(" ", "").replace("/", "").replace(".", "");
+                playerGroups = HelpCenter.Permissions.getGroups(location.getWorld().getName(), player)[0].toString().replace(" ", "").replace("/", "").replace(".", "");
     
-                if (groups.toString().indexOf("[") == -1) {
-                    group = groups;
-                    groups = "[" + groups + "]";
+                if (playerGroups.toString().indexOf("[") == -1) {
+                    playerGroup = playerGroups;
+                    playerGroups = "[" + playerGroups + "]";
                 } else {
-                    group = groups.replace("[", "");
-                    group = group.substring(0, group.indexOf(","));
+                    playerGroup = playerGroups.replace("[", "");
+                    playerGroup = playerGroup.substring(0, playerGroup.indexOf(","));
                 }
             }
         }
-        HelpString = HelpString.replace("%user%", player).replace("%prigroup%", group).replace("%groups%", groups).replace("%helpver%", pluginVersion);
+        HelpString = HelpString.replace("%user%", player)
+                               .replace("%world%", playerWorld)
+                               .replace("%health%", playerHealth)
+                               .replace("%locx%", playerX)
+                               .replace("%locy%", playerY)
+                               .replace("%locz%", playerZ)
+                               .replace("%iteminhandid%", playerItemInHandId)
+                               .replace("%iteminhand%", playerItemInHand)
+                               .replace("%isop%", playerIsOp)
+                               .replace("%prigroup%", playerGroup)
+                               .replace("%groups%", playerGroups)
+                               .replace("%serveronlinecount%", serverOnlineCount)
+                               .replace("%serverver%", serverVersion)
+                               .replace("%helpver%", pluginVersion);
 
         return HelpString;
     }
@@ -594,7 +658,6 @@ public class HelpCenter extends JavaPlugin {
      */
     private static String fetchWebHelp(Player who, String address) throws MalformedURLException {
         String player = who.getDisplayName();
-        address = doStringTokenReplacements(who, address);
         logOutput("Fetching help URL for " + player + ": " + address);
         String result = null;
         URLConnection fConn = null;
