@@ -1,20 +1,28 @@
 Changelog:
+version 1.77 5-June-2011
+    * Added additional key word replacement:
+      %armor%             - Bukkit - player - The players armor durability value (0 = none, 20 = full armor not damaged)
+
+version 1.76 2-June-2011
+    * Updated to work properly with permissions version 3.0+.
+    * Fixed display of message on player login so it has proper line wrapping.
+    
 version 1.75 20-May-2011
     * Added more key word replacements: (total list)
-      %user%              - Bukkit - player - The players name<br/>
-      %world%             - Bukkit - player - The world the player is in<br/>
-      %health%            - Bukkit - player - The players health value (0 = dead, 20 = full health)<br/>
-      %locx%              - Bukkit - player - The players location X<br/>
-      %locy%              - Bukkit - player - The players location Y<br/>
-      %locz%              - Bukkit - player - The players location Z<br/>
-      %iteminhandid%      - Bukkit - player - The ID of the item the player has in hand<br/>
-      %iteminhand%        - Bukkit - player - The item the player has in hand<br/>
-      %isop%              - Bukkit - player - Is the player an OP - "YES" or "NO"<br/>
-      %serveronlinecount% - bukkit - Number of players currently on server<br/>
-      %serverver%         - bukkit - version of the server<br/>
-      %groups%            - Plugin - Permissions - The list of groups to which the player belongs.<br/>
-      %prigroup%          - Plugin - Permissions - The first group returned by Permissions to which the player belongs.<br/>
-      %helpver%           - Plugin - HelpCenter  - Version of the plugin<br/>
+      %user%              - Bukkit - player - The players name
+      %world%             - Bukkit - player - The world the player is in
+      %health%            - Bukkit - player - The players health value (0 = dead, 20 = full health)
+      %locx%              - Bukkit - player - The players location X
+      %locy%              - Bukkit - player - The players location Y
+      %locz%              - Bukkit - player - The players location Z
+      %iteminhandid%      - Bukkit - player - The ID of the item the player has in hand
+      %iteminhand%        - Bukkit - player - The item the player has in hand
+      %isop%              - Bukkit - player - Is the player an OP - "YES" or "NO"
+      %serveronlinecount% - bukkit - Number of players currently on server
+      %serverver%         - bukkit - version of the server
+      %groups%            - Plugin - Permissions - The list of groups to which the player belongs.
+      %prigroup%          - Plugin - Permissions - The first group returned by Permissions to which the player belongs.
+      %helpver%           - Plugin - HelpCenter  - Version of the plugin
 
 version 1.74 10-May 2011
     * Added the Old style colour codes back in so it will support both.

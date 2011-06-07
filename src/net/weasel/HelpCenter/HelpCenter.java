@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.Set;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -20,6 +21,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.Event.Priority;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.PluginManager;
@@ -30,6 +32,8 @@ import com.nijikokun.bukkit.Permissions.Permissions;
 import java.net.*;
 
 public class HelpCenter extends JavaPlugin {
+    private final HelpCenterListener playerListener = new HelpCenterListener(this);
+
     private static String pluginHelpPathNoSlash = "plugins/HelpCenter";
     private static String pluginHelpPath = pluginHelpPathNoSlash + "/";
     private static String[] Colours = { "&0", "&1", "&2", "&3", "&4", "&5", "&6", "&7", 
@@ -42,18 +46,14 @@ public class HelpCenter extends JavaPlugin {
                                         ChatColor.BLACK, ChatColor.DARK_BLUE, ChatColor.DARK_GREEN, ChatColor.DARK_AQUA, ChatColor.DARK_RED, ChatColor.DARK_PURPLE, ChatColor.GOLD, ChatColor.GRAY,
                                         ChatColor.DARK_GRAY, ChatColor.BLUE, ChatColor.GREEN, ChatColor.AQUA, ChatColor.RED, ChatColor.LIGHT_PURPLE, ChatColor.YELLOW, ChatColor.WHITE
                                        };
-    
-    private final HelpCenterListener playerListener = new HelpCenterListener(this);
-    private static String TokenLineSplit = "ZQX123!";
-    private static PermissionHandler Permissions;
+    private static String TokenLineSplit = "ZQX123!";                       //A unique string used to combine and later split combined lines 
+    private static PermissionHandler Permissions;                           //PermissionsHandler object for access to permissions
+    private static String PermissionsVersion;                               //Holds the Permissions version number for later use
+    private static long rSeed = java.util.GregorianCalendar.MILLISECOND;    //used for random number generation
+    private static Random gen = new java.util.Random(rSeed);                //used to help pick a random line number in a help file
 
-    public static long rSeed = java.util.GregorianCalendar.MILLISECOND;
-    public static boolean hasWelcomeFile = false;
-    public static Random gen = new java.util.Random(rSeed);
-    public static int item;
     public static String pluginName = "";
     public static String pluginVersion = "";
-    public static final String DATE_FMT = "yyyy-MM-dd HH:mm:ss";
 
     /**
      * Called when this plugin is enabled
@@ -67,50 +67,6 @@ public class HelpCenter extends JavaPlugin {
         pluginName = this.getDescription().getName();
         pluginVersion = this.getDescription().getVersion();
         logOutput(pluginName + " v" + pluginVersion + " enabled.");
-    }
-    /**
-     * Called from onEnable<br/>
-     * - Hook into the proper events for this plugin<br/>
-     * - Make sure we have a proper HelpCenter directory in the Plugins folder<br/>
-     * - Initialize the Permissions hook for later use
-     * 
-     * @return
-     */
-    public void initHelpCenter() {
-        PluginManager pm = getServer().getPluginManager();
-        pm.registerEvent(Event.Type.PLAYER_JOIN, this.playerListener, Priority.Normal, this);
-        Plugin plugin = pm.getPlugin("HelpCenter");
-
-        // Make sure we have our HelpCenter directory available
-        File path = new File(pluginHelpPathNoSlash);
-        if (!path.exists()) {
-            // See if we have an old directory structure
-            File oldPath = new File("HelpCenter");
-            if (oldPath.exists()) {
-                // HelpCenter directory exists outside of the plugin directory.
-                // We need to fix that by moving it.
-                oldPath.renameTo(path);
-                logOutput("HelpCenter folder moved to '" + pluginHelpPathNoSlash + "'.");
-            } else {
-                // HelpCenter directory does not exist anywhere. Create it.
-                logOutput("Attempting to create new folder '" + pluginHelpPathNoSlash + "'.");
-                if (path.mkdir()) {
-                    logOutput("Created successfully.");
-                } else {
-                    logOutput("Unable to create directory! Do you have write permission?");
-                    pm.disablePlugin(plugin);
-                }
-            }
-        }
-        // Initialize the Permissions hook for later use
-        Plugin test = this.getServer().getPluginManager().getPlugin("Permissions");
-        if (HelpCenter.Permissions == null) {
-            if (test != null) {
-                HelpCenter.Permissions = ((Permissions) test).getHandler();
-            } else {
-                logOutput("Permission system not detected. '%prigroup%' and '%groups%' will be replaced with 'prigroup' and 'groups'");
-            }
-        }
     }
     /**
      * Called when this plugin is disabled
@@ -178,34 +134,507 @@ public class HelpCenter extends JavaPlugin {
         return retVal;
     }
     /**
-     * Sends a message to the indicated player
+     * Will try to display the welcome message to the user on login
      * 
-     * @param player
-     *            Player who will receive the message
-     * @param item
-     *            String a single line statement to send to the player
-     * @param multi
-     *            String[] an array of message lines to send to the player
-     * @param topic
-     *            String used to help prevent infinite loops. On the initial call this should be null
+     * @param who 
+     *             Player who is requesting help information
      */
-    public static void sendToPlayer(Player player, String item, String[] multi, String topic) {
-        // convert a single statement into a multi-line statment with only one
-        // line so we don't duplicate code below.
-        if (multi == null)
-            multi = stringToArray(item);
-        // Output the help lines
-        for (int X = 0; X < multi.length; X++) {
-            try {
-                if (player != null) {
-                    player.sendMessage(cColourFinalize(parseHelpLine(player, multi[X], topic)));
-                } else {
-                    logOutput(parseHelpLine(player, multi[X], topic));
-                }
-            } catch (IOException e) {
-                // Do nothing..
+    public static void ShowWelcomeMessage(Player who) {
+        try {
+            String result = getHelpFile(who, "welcome");
+            CharSequence chk = "No help found for ";
+            
+            if (result.contains(chk) != true) {
+                processHelp(who, result, "");
+            }
+        } 
+        catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Convert a string[] array to a single string
+     * 
+     * @param stringArray
+     *            String[] array containing one or more strings that need to be combined.
+     * @param separator
+     *            String containing what needs to be placed between each of the combined strings.
+     * @return String containing the combined strings.
+     */
+    private static String arrayToString(String[] stringArray, String separator) {
+        String result = "";
+
+        if (stringArray.length > 0) {
+            result = stringArray[0]; // start with the first element
+            for (int i = 1; i < stringArray.length; i++) {
+                result = result + separator + stringArray[i];
             }
         }
+        return result;
+    }
+    /**
+     * This will parse the requested plugin for its plugin.yml file and get the commands out of it to build a helpfile structure.<br/>
+     * A lot more description needs to go here.
+     * 
+     * @param player
+     *            Player who is requesting help information
+     * @param pluginName
+     *            name of the plugin to build 
+     */
+    @SuppressWarnings("unchecked")
+    private String buildHelpFile(Player player, String pluginName) {
+        Plugin plugin = getServer().getPluginManager().getPlugin(pluginName);
+
+        if (plugin != null) {
+            Map<String, Object> commands = (Map<String, Object>)plugin.getDescription().getCommands();
+            if(commands != null) {
+                File path = new File(pluginHelpPath + pluginName.toLowerCase());
+                File pathTxt = new File(pluginHelpPath + pluginName.toLowerCase() + ".txt");
+                if (path.exists() == false && pathTxt.exists() == false) {
+                    if (path.mkdir() == true) {
+                        try {
+                            // Create the plugin index file
+                            FileWriter fstreamPlugin = new FileWriter(path + ".txt");
+                            BufferedWriter outPlugin = new BufferedWriter(fstreamPlugin);
+                            outPlugin.write("&eAvailable commands:\n"
+                                          + "&e---------------------\n"
+                                          + "&e(type '&f/help " + pluginName + " <command>&e' for more info)\n"
+                                          );
+                            //loop through each command available
+                            for (String command : commands.keySet()) {
+                                //get the command
+                                Map<String, Object> helpCommand = (Map<String, Object>) commands.get(command);
+                                //get the description
+                                String description = (String) helpCommand.get("description");
+                                //get the usage
+                                String usage = (String) helpCommand.get("usage");
+                                //get the aliases
+                                ArrayList<String> aliases = (ArrayList<String>)helpCommand.get("aliases");
+
+                                //log that we got something
+                                logOutput("Building " + pluginName + ": " + command);
+                                sendToPlayer(player, "Building " + pluginName + ": " + command, null, null);
+                                
+                                //make sure we have a valid file name
+                                String commandFile = command.replace("/", "").replace(".", "");
+                                //if we stripped the entire command, then just have a file with the .txt extension so we can find it later
+                                if (commandFile.equals("")) commandFile = ".txt";
+                                //write the command into the index 
+                                outPlugin.write(" /" + commandFile + " ");
+                                
+                                try {
+                                    // Create file for command
+                                    FileWriter fstream = new FileWriter(path + "/" + commandFile);
+                                    BufferedWriter out = new BufferedWriter(fstream);
+                                    // Add the command header
+                                    out.write("&e" + command + "\n"
+                                            + "&e--------------------\n");
+
+                                    // Add the description
+                                    if (description != null) out.write("&eDescription: &f" + description + "\n");
+                                    // Add the usage
+                                    if (usage != null)       out.write("&eUsage: &f" + usage.replace("<command>", command) + "\n");
+                                    // Add the aliases
+                                    if (aliases != null)
+                                        for(String alias: aliases) {
+                                            out.write("&eAliases: &f" + alias.replace("<command>", command));
+                                        }
+                                    // Close the output stream
+                                    out.close();
+                                    fstream.close();
+                                } catch (Exception e) {// Catch exception if any
+                                    System.err.println("Error: " + e.getMessage());
+                                }
+                            }
+                            outPlugin.close();
+                            fstreamPlugin.close();
+                        } catch (Exception e) {// Catch exception if any
+                            System.err.println("Error: " + e.getMessage());
+                        }
+                    } else {
+                        logOutput("Unable to create '" + pluginName + "' help directory. Process aborted.");
+                        sendToPlayer(player, "Unable to create '" + pluginName + "' help directory. Process aborted.", null, null);
+                    }                
+                } else {
+                    logOutput("Plugin help already defined. Remove plugin directory and file to rebuild.");
+                    sendToPlayer(player, "Plugin help already defined. Remove plugin help directory and file to rebuild.", null, null);
+                }                
+            } else {
+                logOutput("Plugin '" + pluginName + "' does not have defined commands.");
+                sendToPlayer(player, "Plugin '" + pluginName + "' does not have defined commands.", null, null);
+            }
+        } else {
+            logOutput("Plugin '" + pluginName + "' does not exist.");
+            sendToPlayer(player, "Plugin '" + pluginName + "' does not exist.", null, null);
+        }
+        return ("");
+    }
+    /**
+     * This will parse all installed plugins for their plugin.yml file and get the commands out of it to build a helpfile structure.<br/>
+     * A lot more description needs to go here.
+     * 
+     * @param who
+     *            Player who is requesting help information
+     */
+    private String buildHelpFiles(Player who) {
+        PluginManager pluginManager = getServer().getPluginManager();
+        Plugin[] plugins = pluginManager.getPlugins();
+        String pluginName;
+        String retVal = "";
+        try {
+            // Create file
+            File path = new File(pluginHelpPath + "/HCdefault.txt");
+            if (path.exists() == false) {
+                logOutput("Building 'HCdefault' plugin help.");
+                sendToPlayer(who, "Building 'HCdefault' plugin help.", null, null);
+
+                FileWriter fstream = new FileWriter(path);
+                BufferedWriter out = new BufferedWriter(fstream);
+                out.write("&eAvailable Plugins:\n"
+                        + "&e---------------------\n"
+                        + "&e(type '&f/help <plugin>&e' for more info)\n"
+                        );
+                // Loop through each plugin we can find.
+                for (Plugin plugin : plugins) {
+                    pluginName = plugin.getDescription().getName();
+                    logOutput("Building '" + pluginName + "' plugin help.");
+                    sendToPlayer(who, "Building '" + pluginName + "' plugin help.", null, null);
+                    out.write(" " + pluginName.replace(" ", "").replace("/", "").replace(".", "")); //strip out spaces, dots, and slashes
+                    buildHelpFile(who, pluginName);
+                }
+
+                // Close the output stream
+                out.close();
+            } else {
+                sendToPlayer(who, "HCdefault already exists. Please remove before building plugin help files..", null, null);
+            }
+            retVal = "buildHelpFiles complete.";
+        } catch (Exception e) {// Catch exception if any
+            System.err.println("Error: " + e.getMessage());
+        }
+        return (retVal);
+    }
+    /**
+     * Convert the color keywords of chat colors to the chat codes used by the chat window.
+     * 
+     * @param message
+     *            String to be colorized
+     * 
+     * @return String the colorized message
+     */
+    private static String cColourFinalize(String message) {
+        CharSequence cChk = null;
+        String temp = null;
+
+        for (int x = 0; x < Colours.length; x++) {
+            cChk = Colours[x];
+            if (message.contains(cChk)) {
+                temp = message.replace(cChk, cCode[x].toString());
+                message = temp;
+            }
+        }
+        return message;
+    }
+    /**
+     * Strip the color keywords of chat colors from the message.
+     * 
+     * @param message
+     *            String to be stripped of color keywords
+     * 
+     * @return String the message stripped of color keywords
+     */
+    private static String cColourRemove(String message) {
+        // make sure we have a copy of the string so we do not modify the string itself
+        String returnValue = message.toString();
+
+        // remove the chat colors
+        for (int x = 0; x < Colours.length; x++) {
+            returnValue = returnValue.replace(Colours[x], "");
+        }
+        return returnValue;
+    }
+    /**
+     * Replace key tokens in the string with looked up values.<br/>
+     * <br/>
+     * This will replace the following tokens with the associated values.<br/> 
+     * %user% - Bukkit - player - The players name<br/>
+     * %world% - Bukkit - player - The world the player is in<br/>
+     * %health% - Bukkit - player - The players health value (0 = dead, 20 = full health)<br/>
+     * %locx% - Bukkit - player - The players location X<br/>
+     * %locy% - Bukkit - player - The players location Y<br/>
+     * %locz% - Bukkit - player - The players location Z<br/>
+     * %iteminhandid% - Bukkit - player - The ID of the item the player has in hand<br/>
+     * %iteminhand% - Bukkit - player - The item the player has in hand<br/>
+     * %isop% - Bukkit - player - Is the player an OP - "YES" or "NO"<br/>
+     * %serveronlinecount% - bukkit - Number of players currently on server<br/>
+     * %serverver% - bukkit - version of the server<br/>
+     * %groups% - Plugin - Permissions - The list of groups to which the player belongs.<br/>
+     * %prigroup% - Plugin - Permissions - The first group returned by Permissions to which the player belongs.<br/>
+     * %helpver% - Plugin - HelpCenter - Version of the plugin<br/>
+     * <br/>
+     * If Permissions does not exist, the associated Tokens will be replaced with the same token but have the % stripped off.<br/>
+     * %groups% -> groups<br/>
+     * %prigroup% -> prigroup
+     * 
+     * @param who
+     *            Player that we are getting information about.
+     * @param HelpString
+     *            String containing the Tokens to be replaced
+     * @return String with the tokens replaced.
+     */ 
+    private static String doStringTokenReplacements(Player who, String HelpString) {
+        //declare replaceable variables
+        String player = "user";
+            String playerWorld = "world";
+            String playerHealth = "health";
+            String playerArmor = "armor";
+            String playerX = "locx";
+            String playerY = "locy";
+            String playerZ = "locz";
+            String playerItemInHandId = "iteminhandid";
+            String playerItemInHand = "iteminhand";
+            String playerIsOp = "isop";
+            String playerGroups = "groups";
+            String playerGroup = "prigroup";
+        String serverOnlineCount = "serveronlinecount";
+        String serverVersion = "serverver";
+        
+        //get server variables
+        serverOnlineCount = "" + Bukkit.getServer().getOnlinePlayers().length;
+        serverVersion = "" + Bukkit.getServer().getVersion().replace(" ", "");
+            //extract the build number
+            if (serverVersion.charAt(serverVersion.indexOf("(MC:")-9) == '-')
+                //the build is 3 digits long
+                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-7, serverVersion.indexOf("(MC:")-4);
+            else
+                //the build is 4 digits long (hopefully not more)
+                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-8, serverVersion.indexOf("(MC:")-5);
+                
+        //get player specific variables
+        if (who != null) {
+            Location location = who.getLocation();
+            player = who.getName().replace(" ", "").replace("/", "").replace(".", "");
+            playerHealth = Integer.toString(who.getHealth());
+            playerArmor = Integer.toString(getArmorPoints(who));
+
+            //who.getItemInHand()
+            playerWorld = location.getWorld().getName();
+            playerX = "" + Math.floor(location.getX()); 
+            playerY = "" + Math.floor(location.getY()); 
+            playerZ = "" + Math.floor(location.getZ()); 
+            playerItemInHand = who.getItemInHand().getType().name();
+            playerItemInHandId = "" + who.getItemInHand().getTypeId();
+            playerIsOp = "" + (who.isOp() ? "YES" : "NO");
+
+            //get player specific permission variables
+            if (HelpCenter.Permissions != null) {
+                try {
+                    if (PermissionsVersion.substring(0,1) == "2") {
+                        //Handle the Permissions 2.x style permission groups
+                        playerGroups = HelpCenter.Permissions.getGroups(location.getWorld().getName(), player)[0].toString();
+                        playerGroups.replace(" ", "").replace("/", "").replace(".", "");                        
+                    } else {
+                        //Handle the Permissions 3.x style permission groups
+                        playerGroups = "";
+                        Map<String, Set<String>> allGroups = HelpCenter.Permissions.getAllGroups(location.getWorld().getName(), player);
+                        //loop through each command available
+                        for (String allGroupsKey : allGroups.keySet()) {
+                            Set<String> groups = allGroups.get(allGroupsKey);
+                            for (String group : groups) {
+                                playerGroups += "," + group;
+                                //playerGroups += "," + allGroupsKey + "." + group;
+                            }
+                        }
+                        //strip off leading comma
+                        if (playerGroups.indexOf(",") != -1) {
+                            playerGroups = playerGroups.substring(1);
+                            //if there is more than one group, then surround in brackets
+                            if (playerGroups.indexOf(",") != -1) {
+                                playerGroups = "[" + playerGroups + "]";
+                            }
+                        }
+                    }
+                    if (playerGroups.toString().indexOf("[") == -1) {
+                        playerGroup = playerGroups;
+                        playerGroups = "[" + playerGroups + "]";
+                    } else {
+                        playerGroup = playerGroups.replace("[", "");
+                        playerGroup = playerGroup.substring(0, playerGroup.indexOf(","));
+                    }
+                } catch (Exception e) {
+                    playerGroups = "";
+                    playerGroup = "";
+                }
+            }
+        }
+        HelpString = HelpString.replace("%user%", player)
+                               .replace("%world%", playerWorld)
+                               .replace("%health%", playerHealth)
+                               .replace("%armor%", playerArmor)
+                               .replace("%locx%", playerX)
+                               .replace("%locy%", playerY)
+                               .replace("%locz%", playerZ)
+                               .replace("%iteminhandid%", playerItemInHandId)
+                               .replace("%iteminhand%", playerItemInHand)
+                               .replace("%isop%", playerIsOp)
+                               .replace("%prigroup%", playerGroup)
+                               .replace("%groups%", playerGroups)
+                               .replace("%serveronlinecount%", serverOnlineCount)
+                               .replace("%serverver%", serverVersion)
+                               .replace("%helpver%", pluginVersion);
+
+        return HelpString;
+    }
+    /**
+     * Attempt to fetch a help file from the web.
+     * 
+     * @param who
+     *            Player who is requesting help information
+     * @param address
+     * @return
+     * @throws MalformedURLException
+     */
+    private static String fetchWebHelp(Player who, String address) throws MalformedURLException {
+        String player = who.getDisplayName();
+        logOutput("Fetching help URL for " + player + ": " + address);
+        String result = null;
+        URLConnection fConn = null;
+
+        try {
+            fConn = new URL(address).openConnection();
+            Scanner fSc = new Scanner(fConn.getInputStream());
+            fSc.useDelimiter("\\Z");
+            result = fSc.next();
+        } catch (Exception e) {
+            logOutput("Unable to fetch web help URL: " + address);
+            return ("Unable to fetch web help.");
+        }
+        return (result);
+    }
+    /**
+     * This will return the number of armor points a player has on a scale of 0 - 20
+     * 
+     * This is calculated on the formula of baseArmorPoints * currentDurability / baseDurability which is on a scale of 0 to 10.
+     * Multiply this by 2 to get a scale of 0 to 20.  After the calculation, floor it to get a whole number. 
+     * http://www.minecraftwiki.net/wiki/Item_Durability#Armor_durability
+     * Thanks to Dynmap plugin from which I copied most of this function.
+     * 
+     * @param player
+     *              Player who we are looking at.
+     * @return int value from 0 to 20 indicating no armor to full armor.
+     * 
+     */
+    private static int getArmorPoints(Player player) {
+        //This assumes that the inventory array will be in the order of boots, pants, chest, helmet
+        double armorPoints[] = {1.5,    //Boots
+                                3.0,    //Leggings
+                                4.0,    //Chest plate
+                                1.5};   //Helmet
+        int currentDurability = 0;
+        int baseDurability = 0;
+        double baseArmorPoints = 0;
+        ItemStack inventory[] = player.getInventory().getArmorContents();
+        
+        for(int i=0;i<inventory.length;i++) {
+            final short maxDurability = inventory[i].getType().getMaxDurability();
+            if(maxDurability < 0) continue;                         //Since we do not have any durability, there is no armor in this slot and we should just go to the next slot
+            baseDurability    += maxDurability;                                 //Get the base durability of the item.
+            currentDurability += maxDurability - inventory[i].getDurability();  //Get the current durability of the item. This is calculated by taking the max damage and subtracting the current durability damage.
+            baseArmorPoints   += armorPoints[i];                                //Get the base armor points for the slot.
+        }
+        if (baseDurability == 0) {  //prevent a divide by zero error.
+            return 0;
+        } else {
+            return (int)(2*baseArmorPoints*currentDurability/baseDurability);   //calculate the value and floor it before sending back.
+        }
+    }
+    /**
+     * This will attempt to get the help file from the installed plugins.<br/>
+     * <br/>
+     * Help file search pattern. If the step works, the subsequent steps are not taken.<br/>
+     * <br/>
+     * 1) See if plugin is available.<br/>
+     * 2) If pluginCommand is specified, look for the specific command.<br/>
+     * 3) If pluginCommand is not specified, it will return a list of plugin commands.<br/>
+     * 
+     * @param who
+     *            Player who requested this help file.
+     * @param pluginName
+     *            String the plugin query
+     * @param pluginCommand
+     *            String the plugin command to query
+     * @return String containing the commands of the plugin or a specific plugin command
+     */
+    @SuppressWarnings("unchecked")
+    private String getHelpDirect(String pluginName, String pluginCommand) {
+        PluginManager pluginManager = getServer().getPluginManager();
+        Plugin[] plugins = pluginManager.getPlugins();
+        String retValue = "";
+        if (pluginName != null) {
+            Plugin plugin = null;
+            for (Plugin tempPlugin : plugins) {
+                if (tempPlugin.getDescription().getName().toLowerCase().equals(pluginName.toLowerCase())) { 
+                    plugin = tempPlugin;
+                    pluginName = plugin.getDescription().getName();
+                }
+            }
+            if (plugin != null) {
+                Map<String, Object> commands = (Map<String, Object>)plugin.getDescription().getCommands();
+                if(commands != null) {
+                    if (pluginCommand == null) {
+                        String description = plugin.getDescription().getDescription();
+                        String version = plugin.getDescription().getVersion();
+                        retValue += "&e" + pluginName + " " + version + "\n"
+                        + "&e--------------------\n";
+                        if (description != null) retValue += "&eDescription: &f" + description + "\n";                          // Add the description
+                        retValue += "&eAvailable commands:\n"
+                                  + "&e---------------------\n"
+                                  + "&e(type '&f/helpp " + pluginName + " <command>&e' for more info)\n"
+                                  + "&f";
+                        //loop through each command available
+                        for (String command : commands.keySet()) {
+                            retValue += command + " ";
+                        }
+                    } else {
+                        Map<String, Object> helpCommand = (Map<String, Object>) commands.get(pluginCommand);    //get the commands tree
+                        if (helpCommand != null) {
+                            String description = (String) helpCommand.get("description");                           //get the description
+                            String usage = (String) helpCommand.get("usage");                                       //get the usage
+                            ArrayList<String> aliases = (ArrayList<String>)helpCommand.get("aliases");              //get the aliases
+        
+                            retValue += "&e" + pluginCommand + "\n"
+                                      + "&e--------------------\n";
+                            
+                            if (description != null) retValue += "&eDescription: &f" + description + "\n";                          // Add the description
+                            if (usage != null)       retValue += "&eUsage: &f" + usage.replace("<command>", pluginCommand) + "\n";  // Add the usage
+                            if (aliases != null) {                                                                                  // Add the aliases
+                                retValue += "&eAliases: &f";
+                                for(String alias: aliases) {
+                                    retValue += alias.replace("<command>", pluginCommand) + " ";
+                                }
+                            }
+                        } else {
+                            retValue = "Command '&c" + pluginCommand + "&f' for '" + pluginName + "' plugin, not found.";
+                        }
+                    }
+                }
+            } else {
+                retValue = "Plugin '" + pluginName + "' is not available.";
+            }
+        } else {
+            //create the header
+            retValue = "&eAvailable Plugins:\n"
+                     + "&e---------------------\n"
+                     + "&e(type '&f/helpp <plugin>&e' for more info)\n"
+                     + "&e";
+            // Loop through each plugin we can find.
+            for (Plugin plugin : plugins) {
+                pluginName = plugin.getDescription().getName();
+                retValue += pluginName + " ";
+            }
+        }
+        return (retValue);
     }
     /**
      * This will attempt to get the help file from the plugins/HelpCenter directory.<br/>
@@ -227,7 +656,7 @@ public class HelpCenter extends JavaPlugin {
      * @throws IOException
      *             This is thrown if a file related issue arises.
      */
-    public static String getHelpFile(Player who, String which) throws IOException {
+    private static String getHelpFile(Player who, String which) throws IOException {
         CharSequence checkStr = "../";
         File hFile = null;
         String retVal = "";
@@ -290,90 +719,91 @@ public class HelpCenter extends JavaPlugin {
         return retVal;
     }
     /**
-     * This will attempt to get the help file from the installed plugins.<br/>
-     * <br/>
-     * Help file search pattern. If the step works, the subsequent steps are not taken.<br/>
-     * <br/>
-     * 1) See if plugin is available.<br/>
-     * 2) If pluginCommand is specified, look for the specific command.<br/>
-     * 3) If pluginCommand is not specified, it will return a list of plugin commands.<br/>
+     * Called from onEnable<br/>
+     * - Hook into the proper events for this plugin<br/>
+     * - Make sure we have a proper HelpCenter directory in the Plugins folder<br/>
+     * - Initialize the Permissions hook for later use
      * 
-     * @param who
-     *            Player who requested this help file.
-     * @param pluginName
-     *            String the plugin query
-     * @param pluginCommand
-     *            String the plugin command to query
-     * @return String containing the commands of the plugin or a specific plugin command
+     * @return
      */
-    @SuppressWarnings("unchecked")
-    public String getHelpDirect(String pluginName, String pluginCommand) {
-        PluginManager pluginManager = getServer().getPluginManager();
-        Plugin[] plugins = pluginManager.getPlugins();
-        String retValue = "";
-        if (pluginName != null) {
-            Plugin plugin = null;
-            for (Plugin tempPlugin : plugins) {
-                if (tempPlugin.getDescription().getName().toLowerCase().equals(pluginName.toLowerCase())) { 
-                    plugin = tempPlugin;
-                    pluginName = plugin.getDescription().getName();
-                }
-            }
-            if (plugin != null) {
-                Map<String, Object> commands = (Map<String, Object>)plugin.getDescription().getCommands();
-                if(commands != null) {
-                    if (pluginCommand == null) {
-                        String description = plugin.getDescription().getDescription();
-                        retValue += "&e" + pluginName + "\n"
-                        + "&e--------------------\n";
-                        if (description != null) retValue += "&eDescription: &f" + description + "\n";                          // Add the description
-                        retValue += "&eAvailable commands:\n"
-                                  + "&e---------------------\n"
-                                  + "&e(type '&f/helpp " + pluginName + " <command>&e' for more info)\n"
-                                  + "&f";
-                        //loop through each command available
-                        for (String command : commands.keySet()) {
-                            retValue += command + " ";
-                        }
-                    } else {
-                        Map<String, Object> helpCommand = (Map<String, Object>) commands.get(pluginCommand);    //get the commands tree
-                        if (helpCommand != null) {
-                            String description = (String) helpCommand.get("description");                           //get the description
-                            String usage = (String) helpCommand.get("usage");                                       //get the usage
-                            ArrayList<String> aliases = (ArrayList<String>)helpCommand.get("aliases");              //get the aliases
-        
-                            retValue += "&e" + pluginCommand + "\n"
-                                      + "&e--------------------\n";
-                            
-                            if (description != null) retValue += "&eDescription: &f" + description + "\n";                          // Add the description
-                            if (usage != null)       retValue += "&eUsage: &f" + usage.replace("<command>", pluginCommand) + "\n";  // Add the usage
-                            if (aliases != null) {                                                                                  // Add the aliases
-                                retValue += "&eAliases: &f";
-                                for(String alias: aliases) {
-                                    retValue += alias.replace("<command>", pluginCommand) + " ";
-                                }
-                            }
-                        } else {
-                            retValue = "Command '&c" + pluginCommand + "&f' for '" + pluginName + "' plugin, not found.";
-                        }
-                    }
-                }
+    private void initHelpCenter() {
+        PluginManager pm = getServer().getPluginManager();
+        pm.registerEvent(Event.Type.PLAYER_JOIN, this.playerListener, Priority.Normal, this);
+        Plugin plugin = pm.getPlugin("HelpCenter");
+
+        // Make sure we have our HelpCenter directory available
+        File path = new File(pluginHelpPathNoSlash);
+        if (!path.exists()) {
+            // See if we have an old directory structure
+            File oldPath = new File("HelpCenter");
+            if (oldPath.exists()) {
+                // HelpCenter directory exists outside of the plugin directory.
+                // We need to fix that by moving it.
+                oldPath.renameTo(path);
+                logOutput("HelpCenter folder moved to '" + pluginHelpPathNoSlash + "'.");
             } else {
-                retValue = "Plugin '" + pluginName + "' is not available.";
-            }
-        } else {
-            //create the header
-            retValue = "&eAvailable Plugins:\n"
-                     + "&e---------------------\n"
-                     + "&e(type '&f/helpp <plugin>&e' for more info)\n"
-                     + "&e";
-            // Loop through each plugin we can find.
-            for (Plugin plugin : plugins) {
-                pluginName = plugin.getDescription().getName();
-                retValue += pluginName + " ";
+                // HelpCenter directory does not exist anywhere. Create it.
+                logOutput("Attempting to create new folder '" + pluginHelpPathNoSlash + "'.");
+                if (path.mkdir()) {
+                    logOutput("Created successfully.");
+                } else {
+                    logOutput("Unable to create directory! Do you have write permission?");
+                    pm.disablePlugin(plugin);
+                }
             }
         }
-        return (retValue);
+        // Initialize the Permissions hook for later use
+        Plugin test = this.getServer().getPluginManager().getPlugin("Permissions");
+        if (HelpCenter.Permissions == null) {
+            if (test != null) {
+                HelpCenter.Permissions = ((Permissions) test).getHandler();
+                HelpCenter.PermissionsVersion = test.getDescription().getVersion();
+            } else {
+                logOutput("Permission system not detected. '%prigroup%' and '%groups%' will be replaced with 'prigroup' and 'groups'");
+            }
+        }
+    }
+    /**
+     * Break a message line into multiple lines if the line exceeds 60 characters.
+     * 
+     * @param messageLine
+     *            String message to be split if necessary
+     * @return String[] array of one or more lines of text.
+     */
+    private static String[] lineWrap(String messageLine) {
+        if (messageLine.startsWith("["))
+            return (stringToArray(messageLine));
+
+        String[] retVal = null;
+        String retTemp = "";
+        String tempVal = "";
+
+        if (cColourRemove(messageLine).length() > 60) {
+            String[] words = messageLine.split(" ");
+            for (int X = 0; X < words.length; X++) {
+                tempVal += words[X] + " ";
+                if (cColourRemove(tempVal).length() > 60) {
+                    String[] foo = tempVal.trim().split(" ");
+                    foo[foo.length - 1] = "";
+                    retTemp += arrayToString(foo, " ").trim() + TokenLineSplit;
+                    tempVal = "";
+                    X--;
+                }
+            }
+            retTemp += tempVal;
+            retVal = retTemp.split(TokenLineSplit);
+        } else
+            retVal = stringToArray(messageLine);
+        return retVal;
+    }
+    /**
+     * Output the message to the console with the plugin name prepended to it.
+     * 
+     * @param output
+     *            String of the message to be output.
+     */
+    private static void logOutput(String output) {
+        System.out.println("[HelpCenter] " + output);
     }
     /**
      * This will go through the help Text string and try to handle redirections. <br/>
@@ -388,7 +818,7 @@ public class HelpCenter extends JavaPlugin {
      * @return String of the redirected to help file
      * @throws IOException
      */
-    public static String parseHelpLine(Player who, String helpLine, String topic) throws IOException {
+    private static String parseHelpLine(Player who, String helpLine, String topic) throws IOException {
         //Replace tokens in line if present
         helpLine = doStringTokenReplacements(who, helpLine);
         
@@ -432,392 +862,6 @@ public class HelpCenter extends JavaPlugin {
         } else {
             return (helpLine);
         }
-    }
-    
-
-    /**
-     * Convert the color keywords of chat colors to the chat codes used by the chat window.
-     * 
-     * @param message
-     *            String to be colorized
-     * 
-     * @return String the colorized message
-     */
-    private static String cColourFinalize(String message) {
-        CharSequence cChk = null;
-        String temp = null;
-
-        for (int x = 0; x < Colours.length; x++) {
-            cChk = Colours[x];
-            if (message.contains(cChk)) {
-                temp = message.replace(cChk, cCode[x].toString());
-                message = temp;
-            }
-        }
-        return message;
-    }
-    /**
-     * Strip the color keywords of chat colors from the message.
-     * 
-     * @param message
-     *            String to be stripped of color keywords
-     * 
-     * @return String the message stripped of color keywords
-     */
-    private static String cColourRemove(String message) {
-        // make sure we have a copy of the string so we do not modify the string itself
-        String returnValue = message.toString();
-
-        // remove the chat colors
-        for (int x = 0; x < Colours.length; x++) {
-            returnValue = returnValue.replace(Colours[x], "");
-        }
-        return returnValue;
-    }
-    /**
-     * Output the message to the console with the plugin name prepended to it.
-     * 
-     * @param output
-     *            String of the message to be output.
-     */
-    private static void logOutput(String output) {
-        System.out.println("[HelpCenter] " + output);
-    }
-    /**
-     * Break a message line into multiple lines if the line exceeds 60 characters.
-     * 
-     * @param messageLine
-     *            String message to be split if necessary
-     * @return String[] array of one or more lines of text.
-     */
-    private static String[] lineWrap(String messageLine) {
-        if (messageLine.startsWith("["))
-            return (stringToArray(messageLine));
-
-        String[] retVal = null;
-        String retTemp = "";
-        String tempVal = "";
-
-        if (cColourRemove(messageLine).length() > 60) {
-            String[] words = messageLine.split(" ");
-            for (int X = 0; X < words.length; X++) {
-                tempVal += words[X] + " ";
-                if (cColourRemove(tempVal).length() > 60) {
-                    String[] foo = tempVal.trim().split(" ");
-                    foo[foo.length - 1] = "";
-                    retTemp += arrayToString(foo, " ").trim() + TokenLineSplit;
-                    tempVal = "";
-                    X--;
-                }
-            }
-            retTemp += tempVal;
-            retVal = retTemp.split(TokenLineSplit);
-        } else
-            retVal = stringToArray(messageLine);
-        return retVal;
-    }
-    /**
-     * Convert a String to a String[].
-     * 
-     * @param line
-     *            String that needs to be split into the array
-     * @return String[] array containing the single string split on the TokenLineSplit indicator.
-     */
-    private static String[] stringToArray(String line) {
-        return (line.concat(TokenLineSplit).split(TokenLineSplit));
-    }
-    /**
-     * Convert a string[] array to a single string
-     * 
-     * @param stringArray
-     *            String[] array containing one or more strings that need to be combined.
-     * @param separator
-     *            String containing what needs to be placed between each of the combined strings.
-     * @return String containing the combined strings.
-     */
-    private static String arrayToString(String[] stringArray, String separator) {
-        String result = "";
-
-        if (stringArray.length > 0) {
-            result = stringArray[0]; // start with the first element
-            for (int i = 1; i < stringArray.length; i++) {
-                result = result + separator + stringArray[i];
-            }
-        }
-        return result;
-    }
-    /**
-     * Replace key tokens in the string with looked up values.<br/>
-     * <br/>
-     * This will replace the following tokens with the associated values.<br/> 
-     * %user% - Bukkit - player - The players name<br/>
-     * %world% - Bukkit - player - The world the player is in<br/>
-     * %health% - Bukkit - player - The players health value (0 = dead, 20 = full health)<br/>
-     * %locx% - Bukkit - player - The players location X<br/>
-     * %locy% - Bukkit - player - The players location Y<br/>
-     * %locz% - Bukkit - player - The players location Z<br/>
-     * %iteminhandid% - Bukkit - player - The ID of the item the player has in hand<br/>
-     * %iteminhand% - Bukkit - player - The item the player has in hand<br/>
-     * %isop% - Bukkit - player - Is the player an OP - "YES" or "NO"<br/>
-     * %serveronlinecount% - bukkit - Number of players currently on server<br/>
-     * %serverver% - bukkit - version of the server<br/>
-     * %groups% - Plugin - Permissions - The list of groups to which the player belongs.<br/>
-     * %prigroup% - Plugin - Permissions - The first group returned by Permissions to which the player belongs.<br/>
-     * %helpver% - Plugin - HelpCenter - Version of the plugin<br/>
-     * <br/>
-     * If Permissions does not exist, the associated Tokens will be replaced with the same token but have the % stripped off.<br/>
-     * %groups% -> groups<br/>
-     * %prigroup% -> prigroup
-     * 
-     * @param who
-     *            Player that we are getting information about.
-     * @param HelpString
-     *            String containing the Tokens to be replaced
-     * @return String with the tokens replaced.
-     */ 
-    private static String doStringTokenReplacements(Player who, String HelpString) {
-        //declare replaceable variables
-        String player = "user";
-            String playerWorld = "world";
-            String playerHealth = "health";
-            String playerX = "locx";
-            String playerY = "locy";
-            String playerZ = "locz";
-            String playerItemInHandId = "iteminhandid";
-            String playerItemInHand = "iteminhand";
-            String playerIsOp = "isop";
-            String playerGroups = "groups";
-            String playerGroup = "prigroup";
-        String serverOnlineCount = "serveronlinecount";
-        String serverVersion = "serverver";
-        
-        //get server variables
-        serverOnlineCount = "" + Bukkit.getServer().getOnlinePlayers().length;
-        serverVersion = "" + Bukkit.getServer().getVersion().replace(" ", "");
-            //extract the build number
-            if (serverVersion.charAt(serverVersion.indexOf("(MC:")-9) == '-')
-                //the build is 3 digits long
-                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-7, serverVersion.indexOf("(MC:")-4);
-            else
-                //the build is 4 digits long (hopefully not more)
-                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-8, serverVersion.indexOf("(MC:")-5);
-                
-        //get player specific variables
-        if (who != null) {
-            Location location = who.getLocation();
-            player = who.getName().replace(" ", "").replace("/", "").replace(".", "");
-            playerHealth = Integer.toString(who.getHealth());
-
-            //who.getItemInHand()
-            playerWorld = location.getWorld().getName();
-            playerX = "" + Math.floor(location.getX()); 
-            playerY = "" + Math.floor(location.getY()); 
-            playerZ = "" + Math.floor(location.getZ()); 
-            playerItemInHand = who.getItemInHand().getType().name();
-            playerItemInHandId = "" + who.getItemInHand().getTypeId();
-            playerIsOp = "" + (who.isOp() ? "YES" : "NO");
-
-            //get player specific permission variables
-            if (HelpCenter.Permissions != null) {
-                playerGroups = HelpCenter.Permissions.getGroups(location.getWorld().getName(), player)[0].toString().replace(" ", "").replace("/", "").replace(".", "");
-    
-                if (playerGroups.toString().indexOf("[") == -1) {
-                    playerGroup = playerGroups;
-                    playerGroups = "[" + playerGroups + "]";
-                } else {
-                    playerGroup = playerGroups.replace("[", "");
-                    playerGroup = playerGroup.substring(0, playerGroup.indexOf(","));
-                }
-            }
-        }
-        HelpString = HelpString.replace("%user%", player)
-                               .replace("%world%", playerWorld)
-                               .replace("%health%", playerHealth)
-                               .replace("%locx%", playerX)
-                               .replace("%locy%", playerY)
-                               .replace("%locz%", playerZ)
-                               .replace("%iteminhandid%", playerItemInHandId)
-                               .replace("%iteminhand%", playerItemInHand)
-                               .replace("%isop%", playerIsOp)
-                               .replace("%prigroup%", playerGroup)
-                               .replace("%groups%", playerGroups)
-                               .replace("%serveronlinecount%", serverOnlineCount)
-                               .replace("%serverver%", serverVersion)
-                               .replace("%helpver%", pluginVersion);
-
-        return HelpString;
-    }
-    /**
-     * Attempt to fetch a help file from the web.
-     * 
-     * @param who
-     *            Player who is requesting help information
-     * @param address
-     * @return
-     * @throws MalformedURLException
-     */
-    private static String fetchWebHelp(Player who, String address) throws MalformedURLException {
-        String player = who.getDisplayName();
-        logOutput("Fetching help URL for " + player + ": " + address);
-        String result = null;
-        URLConnection fConn = null;
-
-        try {
-            fConn = new URL(address).openConnection();
-            Scanner fSc = new Scanner(fConn.getInputStream());
-            fSc.useDelimiter("\\Z");
-            result = fSc.next();
-        } catch (Exception e) {
-            logOutput("Unable to fetch web help URL: " + address);
-            return ("Unable to fetch web help.");
-        }
-        return (result);
-    }
-    /**
-     * This will parse all installed plugins for their plugin.yml file and get the commands out of it to build a helpfile structure.<br/>
-     * A lot more description needs to go here.
-     * 
-     * @param who
-     *            Player who is requesting help information
-     */
-    private String buildHelpFiles(Player who) {
-        PluginManager pluginManager = getServer().getPluginManager();
-        Plugin[] plugins = pluginManager.getPlugins();
-        String pluginName;
-        String retVal = "";
-        try {
-            // Create file
-            File path = new File(pluginHelpPath + "/HCdefault.txt");
-            if (path.exists() == false) {
-                logOutput("Building 'HCdefault' plugin help.");
-                sendToPlayer(who, "Building 'HCdefault' plugin help.", null, null);
-
-                FileWriter fstream = new FileWriter(path);
-                BufferedWriter out = new BufferedWriter(fstream);
-                out.write("&eAvailable Plugins:\n"
-                        + "&e---------------------\n"
-                        + "&e(type '&f/help <plugin>&e' for more info)\n"
-                        );
-                // Loop through each plugin we can find.
-                for (Plugin plugin : plugins) {
-                    pluginName = plugin.getDescription().getName();
-                    logOutput("Building '" + pluginName + "' plugin help.");
-                    sendToPlayer(who, "Building '" + pluginName + "' plugin help.", null, null);
-                    out.write(" " + pluginName.replace(" ", "").replace("/", "").replace(".", "")); //strip out spaces, dots, and slashes
-                    buildHelpFile(who, pluginName);
-                }
-
-                // Close the output stream
-                out.close();
-            } else {
-                sendToPlayer(who, "HCdefault already exists. Please remove before building plugin help files..", null, null);
-            }
-            retVal = "buildHelpFiles complete.";
-        } catch (Exception e) {// Catch exception if any
-            System.err.println("Error: " + e.getMessage());
-        }
-        return (retVal);
-    }
-    /**
-     * This will parse the requested plugin for its plugin.yml file and get the commands out of it to build a helpfile structure.<br/>
-     * A lot more description needs to go here.
-     * 
-     * @param player
-     *            Player who is requesting help information
-     * @param pluginName
-     *            name of the plugin to build 
-     */
-    @SuppressWarnings("unchecked")
-    private String buildHelpFile(Player player, String pluginName) {
-        Plugin plugin = getServer().getPluginManager().getPlugin(pluginName);
-
-        if (plugin != null) {
-            Map<String, Object> commands = (Map<String, Object>)plugin.getDescription().getCommands();
-            if(commands != null) {
-                File path = new File(pluginHelpPath + pluginName.toLowerCase());
-                File pathTxt = new File(pluginHelpPath + pluginName.toLowerCase() + ".txt");
-                if (path.exists() == false && pathTxt.exists() == false) {
-                    if (path.mkdir() == true) {
-                        try {
-                            // Create the plugin index file
-                            FileWriter fstreamPlugin = new FileWriter(path + ".txt");
-                            BufferedWriter outPlugin = new BufferedWriter(fstreamPlugin);
-                            outPlugin.write("&eAvailable commands:\n"
-                                          + "&e---------------------\n"
-                                          + "&e(type '&f/help " + pluginName + " <command>&e' for more info)\n"
-                                          );
-                            //loop through each command available
-                            for (String command : commands.keySet()) {
-                                //get the command
-                                Map<String, Object> helpCommand = (Map<String, Object>) commands.get(command);
-                                //get the description
-logOutput("getting Description");
-                                String description = (String) helpCommand.get("description");
-                                //get the usage
-logOutput("getting Usage");
-                                String usage = (String) helpCommand.get("usage");
-                                //get the aliases
-logOutput("getting Aliases");
-                                ArrayList<String> aliases = (ArrayList<String>)helpCommand.get("aliases");
-logOutput("after Aliases");
-
-                                //log that we got something
-                                logOutput("Building " + pluginName + ": " + command);
-                                sendToPlayer(player, "Building " + pluginName + ": " + command, null, null);
-                                
-                                //make sure we have a valid file name
-                                String commandFile = command.replace("/", "").replace(".", "");
-                                //if we stripped the entire command, then just have a file with the .txt extension so we can find it later
-                                if (commandFile.equals("")) commandFile = ".txt";
-                                //write the command into the index 
-                                outPlugin.write(" /" + commandFile + " ");
-                                
-                                try {
-                                    // Create file for command
-                                    FileWriter fstream = new FileWriter(path + "/" + commandFile);
-                                    BufferedWriter out = new BufferedWriter(fstream);
-                                    // Add the command header
-                                    out.write("&e" + command + "\n"
-                                            + "&e--------------------\n");
-
-                                    // Add the description
-                                    if (description != null) out.write("&eDescription: &f" + description + "\n");
-                                    // Add the usage
-                                    if (usage != null)       out.write("&eUsage: &f" + usage.replace("<command>", command) + "\n");
-                                    // Add the aliases
-                                    if (aliases != null)
-                                        for(String alias: aliases) {
-                                            out.write("&eAliases: &f" + alias.replace("<command>", command));
-                                        }
-                                    // Close the output stream
-                                    out.close();
-                                    fstream.close();
-                                } catch (Exception e) {// Catch exception if any
-                                    System.err.println("Error: " + e.getMessage());
-                                }
-                            }
-                            outPlugin.close();
-                            fstreamPlugin.close();
-                        } catch (Exception e) {// Catch exception if any
-                            System.err.println("Error: " + e.getMessage());
-                        }
-                    } else {
-                        logOutput("Unable to create '" + pluginName + "' help directory. Process aborted.");
-                        sendToPlayer(player, "Unable to create '" + pluginName + "' help directory. Process aborted.", null, null);
-                    }                
-                } else {
-                    logOutput("Plugin help already defined. Remove plugin directory and file to rebuild.");
-                    sendToPlayer(player, "Plugin help already defined. Remove plugin help directory and file to rebuild.", null, null);
-                }                
-            } else {
-                logOutput("Plugin '" + pluginName + "' does not have defined commands.");
-                sendToPlayer(player, "Plugin '" + pluginName + "' does not have defined commands.", null, null);
-            }
-        } else {
-            logOutput("Plugin '" + pluginName + "' does not exist.");
-            sendToPlayer(player, "Plugin '" + pluginName + "' does not exist.", null, null);
-        }
-        return ("");
     }
     /**
      * Goes through each line of the help file and outputs it to the player.<br/>
@@ -886,7 +930,47 @@ logOutput("after Aliases");
             }
         }
     }
-
+    /**
+     * Sends a message to the indicated player
+     * 
+     * @param player
+     *            Player who will receive the message
+     * @param item
+     *            String a single line statement to send to the player
+     * @param multi
+     *            String[] an array of message lines to send to the player
+     * @param topic
+     *            String used to help prevent infinite loops. On the initial call this should be null
+     */
+    private static void sendToPlayer(Player player, String item, String[] multi, String topic) {
+        // convert a single statement into a multi-line statment with only one
+        // line so we don't duplicate code below.
+        if (multi == null)
+            multi = stringToArray(item);
+        // Output the help lines
+        for (int X = 0; X < multi.length; X++) {
+            try {
+                if (player != null) {
+                    player.sendMessage(cColourFinalize(parseHelpLine(player, multi[X], topic)));
+                } else {
+                    logOutput(parseHelpLine(player, multi[X], topic));
+                }
+            } catch (IOException e) {
+                // Do nothing..
+            }
+        }
+    }
+    /**
+     * Convert a String to a String[].
+     * 
+     * @param line
+     *            String that needs to be split into the array
+     * @return String[] array containing the single string split on the TokenLineSplit indicator.
+     */
+    private static String[] stringToArray(String line) {
+        return (line.concat(TokenLineSplit).split(TokenLineSplit));
+    }
+        
     /******************************************
      * Possibly unused functions
      ******************************************/

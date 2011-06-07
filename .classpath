@@ -4,6 +4,6 @@
 	<classpathentry excluding="src/" kind="src" path=""/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="K:/Apps/Minecraft/Server/Bukkit/craftbukkit.jar" sourcepath="K:/Src/Bukkit/src/main/java/"/>
-	<classpathentry kind="lib" path="K:/Apps/Minecraft/Server/Bukkit/plugins/Permissions.jar"/>
+	<classpathentry kind="lib" path="K:/Apps/Minecraft/Server/Bukkit/Plugins/Permissions.jar" sourcepath="K:/Src/Permissions/PermissionsSource.zip"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
