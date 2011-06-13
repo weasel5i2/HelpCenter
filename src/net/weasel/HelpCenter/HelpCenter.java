@@ -2,13 +2,11 @@ package net.weasel.HelpCenter;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.BufferedInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
@@ -16,12 +14,16 @@ import java.util.Set;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.CoalType;
+import org.bukkit.DyeColor;
+import org.bukkit.TreeSpecies;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.Event.Priority;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.Material;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.PluginManager;
@@ -115,6 +117,11 @@ public class HelpCenter extends JavaPlugin {
                             contents = getHelpDirect(args[0], null);
                     else
                         contents = getHelpDirect(null, null);
+                else if (pCommand.equals("helpitem"))
+                    if (args.length >= 1)
+                        contents = getHelpDirectItem(args[0].toLowerCase());
+                    else
+                        contents = getHelpDirectItem("");
                 else if (args.length > 0)
                     if ((args[0].toLowerCase().equals("buildhelpfiles")))
                         contents = buildHelpFiles(null);
@@ -177,13 +184,13 @@ public class HelpCenter extends JavaPlugin {
      * This will parse the requested plugin for its plugin.yml file and get the commands out of it to build a helpfile structure.<br/>
      * A lot more description needs to go here.
      * 
-     * @param player
+     * @param who
      *            Player who is requesting help information
      * @param pluginName
      *            name of the plugin to build 
      */
     @SuppressWarnings("unchecked")
-    private String buildHelpFile(Player player, String pluginName) {
+    private String buildHelpFile(Player who, String pluginName) {
         Plugin plugin = getServer().getPluginManager().getPlugin(pluginName);
 
         if (plugin != null) {
@@ -214,7 +221,7 @@ public class HelpCenter extends JavaPlugin {
 
                                 //log that we got something
                                 logOutput("Building " + pluginName + ": " + command);
-                                sendToPlayer(player, "Building " + pluginName + ": " + command, null, null);
+                                sendToPlayer(who, "Building " + pluginName + ": " + command, null, null);
                                 
                                 //make sure we have a valid file name
                                 String commandFile = command.replace("/", "").replace(".", "");
@@ -254,19 +261,19 @@ public class HelpCenter extends JavaPlugin {
                         }
                     } else {
                         logOutput("Unable to create '" + pluginName + "' help directory. Process aborted.");
-                        sendToPlayer(player, "Unable to create '" + pluginName + "' help directory. Process aborted.", null, null);
+                        sendToPlayer(who, "Unable to create '" + pluginName + "' help directory. Process aborted.", null, null);
                     }                
                 } else {
                     logOutput("Plugin help already defined. Remove plugin directory and file to rebuild.");
-                    sendToPlayer(player, "Plugin help already defined. Remove plugin help directory and file to rebuild.", null, null);
+                    sendToPlayer(who, "Plugin help already defined. Remove plugin help directory and file to rebuild.", null, null);
                 }                
             } else {
                 logOutput("Plugin '" + pluginName + "' does not have defined commands.");
-                sendToPlayer(player, "Plugin '" + pluginName + "' does not have defined commands.", null, null);
+                sendToPlayer(who, "Plugin '" + pluginName + "' does not have defined commands.", null, null);
             }
         } else {
             logOutput("Plugin '" + pluginName + "' does not exist.");
-            sendToPlayer(player, "Plugin '" + pluginName + "' does not exist.", null, null);
+            sendToPlayer(who, "Plugin '" + pluginName + "' does not exist.", null, null);
         }
         return ("");
     }
@@ -490,9 +497,11 @@ public class HelpCenter extends JavaPlugin {
      * Attempt to fetch a help file from the web.
      * 
      * @param who
-     *            Player who is requesting help information
+     *          Player who is requesting help information
      * @param address
+     *          URL to attempt to retrieve
      * @return
+     *          String containing the pulled text
      * @throws MalformedURLException
      */
     private static String fetchWebHelp(Player who, String address) throws MalformedURLException {
@@ -520,12 +529,12 @@ public class HelpCenter extends JavaPlugin {
      * http://www.minecraftwiki.net/wiki/Item_Durability#Armor_durability
      * Thanks to Dynmap plugin from which I copied most of this function.
      * 
-     * @param player
+     * @param who
      *              Player who we are looking at.
      * @return int value from 0 to 20 indicating no armor to full armor.
      * 
      */
-    private static int getArmorPoints(Player player) {
+    private static int getArmorPoints(Player who) {
         //This assumes that the inventory array will be in the order of boots, pants, chest, helmet
         double armorPoints[] = {1.5,    //Boots
                                 3.0,    //Leggings
@@ -534,7 +543,7 @@ public class HelpCenter extends JavaPlugin {
         int currentDurability = 0;
         int baseDurability = 0;
         double baseArmorPoints = 0;
-        ItemStack inventory[] = player.getInventory().getArmorContents();
+        ItemStack inventory[] = who.getInventory().getArmorContents();
         
         for(int i=0;i<inventory.length;i++) {
             final short maxDurability = inventory[i].getType().getMaxDurability();
@@ -633,6 +642,85 @@ public class HelpCenter extends JavaPlugin {
                 pluginName = plugin.getDescription().getName();
                 retValue += pluginName + " ";
             }
+        }
+        return (retValue);
+    }
+    /**
+     * This will return a list of items that are recognized by bukkit.  
+     *   This list can be filtered by the string itemName. 
+     *   If the itemName is in any part of the item name or ID, it will be shown.
+     *    
+     * @param itemName
+     *            String containing the characters to filter the list  
+     * @return String containing the list of items that match. 
+     */
+    private String getHelpDirectItem(String itemName) {
+        String partialRetValue = "";
+        String retValue = "";
+        boolean itemShowFlag = false;
+        Material[] items = Material.values();
+        for (Material item : items) {
+            itemShowFlag = (Integer.toString(item.getId()).contains(itemName) || item.toString().toLowerCase().contains(itemName) ? true : false);
+            partialRetValue = "";
+            if (item.getData() == null)
+                if (itemShowFlag)
+                    partialRetValue = item.getId() + " - " + item.toString() + "\n";
+            else {
+                switch (item) {
+                    case SAPLING:
+                    case LOG:
+                    case LEAVES:
+                        TreeSpecies[] species = TreeSpecies.values();
+                        partialRetValue = "";
+                        for (TreeSpecies specie : species) 
+                            if (itemShowFlag || Integer.toString(specie.getData()).contains(itemName) || specie.toString().toLowerCase().contains(itemName))
+                                partialRetValue += item.getId() + ":" + specie.getData() + " - " + item.toString() + " (" + specie.toString() + ")\n";
+                        break;
+                    case WOOL:
+                    case INK_SACK:
+                        DyeColor[] colors = DyeColor.values();
+                        partialRetValue = "";
+                        if (item == Material.WOOL) {
+                            for (DyeColor color : colors)
+                                if (itemShowFlag || Integer.toString(color.getData()).contains(itemName) || color.toString().toLowerCase().contains(itemName))
+                                    partialRetValue += item.getId() + ":" + color.getData() + " - " + item.toString() + " (" + color.toString() + ")\n";
+                        } else {
+                            String tempRetValue = "";
+                            for (DyeColor color : colors) 
+                                if (itemShowFlag || Integer.toString(color.getData()).contains(itemName) || color.toString().toLowerCase().contains(itemName))
+                                    tempRetValue = item.getId() + ":" + (15 - color.getData()) + " - " + item.toString() + " (" + color.toString() + ")\n" + tempRetValue;
+                            partialRetValue += tempRetValue;
+                        }
+                        break;
+                    case DOUBLE_STEP:
+                    case STEP:
+                        partialRetValue = (itemShowFlag || "0".contains(itemName) || "STONE".contains(itemName)       ? item.getId() + ":0 - " + item.toString() + " (STONE)\n" : "") +
+                                          (itemShowFlag || "1".contains(itemName) || "SANDSTONE".contains(itemName)   ? item.getId() + ":1 - " + item.toString() + " (SANDSTONE)\n" : "") +
+                                          (itemShowFlag || "2".contains(itemName) || "WOOD".contains(itemName)        ? item.getId() + ":2 - " + item.toString() + " (WOOD)\n" : "") +
+                                          (itemShowFlag || "3".contains(itemName) || "COBBLESTONE".contains(itemName) ? item.getId() + ":3 - " + item.toString() + " (COBBLESTONE)\n" : "") ;
+                        break;
+                    case COAL:
+                        CoalType[] coaltypes = CoalType.values();
+                        partialRetValue = "";
+                        for (CoalType coaltype : coaltypes) 
+                            if (itemShowFlag || Integer.toString(coaltype.getData()).contains(itemName) || coaltype.toString().toLowerCase().contains(itemName))
+                                partialRetValue += item.getId() + ":" + coaltype.getData() + " - " + item.toString() + " (" + coaltype.toString() + ")\n";
+                        break;
+                    //Uncomment for future release when LONG_GRASS exists
+                    //case LONG_GRASS:
+                    //    GrassSpecies[] species = GrassSpecies.values();
+                    //    for (GrassSpecies specie : species) 
+                    //        if (specie.getData() == 0)
+                    //            partialRetValue += item.getId() + ":0 - " + item.toString() + "\n";
+                    //        else
+                    //            partialRetValue += item.getId() + ":" + specie.getData() + " - " + specie.toString() + "_" + item.toString() + "\n";
+                    //    break;
+                    default:
+                        if (itemShowFlag)
+                            partialRetValue = item.getId() + " - " + item.toString() + "\n";
+                }
+            }
+            retValue += partialRetValue;
         }
         return (retValue);
     }
@@ -774,27 +862,42 @@ public class HelpCenter extends JavaPlugin {
         if (messageLine.startsWith("["))
             return (stringToArray(messageLine));
 
-        String[] retVal = null;
-        String retTemp = "";
+        String retVal = "";
         String tempVal = "";
+        String tempStrippedVal = "";
 
         if (cColourRemove(messageLine).length() > 60) {
-            String[] words = messageLine.split(" ");
+            String[] words = messageLine.split(" ", -1);
+            String[] wordsStripped = cColourRemove(messageLine).split(" ", -1);
             for (int X = 0; X < words.length; X++) {
-                tempVal += words[X] + " ";
-                if (cColourRemove(tempVal).length() > 60) {
-                    String[] foo = tempVal.trim().split(" ");
-                    foo[foo.length - 1] = "";
-                    retTemp += arrayToString(foo, " ").trim() + TokenLineSplit;
-                    tempVal = "";
-                    X--;
+                if ((tempStrippedVal + wordsStripped[X]).length() > 60) {
+                    //The added word would push the length to be greater than 60
+                    if(tempStrippedVal.trim().length() != 0) {
+                        retVal += TokenLineSplit + tempVal.trim();    //save the current line without the new part
+                        tempVal = "";
+                        tempStrippedVal = "";
+                    }
+                    //queue up the new part of the line
+                    tempVal += words[X] + " ";
+                    tempStrippedVal += wordsStripped[X] + " ";
+                } else {
+                    //add the current part to the previous part of the line
+                    tempVal += words[X] + " ";
+                    tempStrippedVal += wordsStripped[X] + " "; 
                 }
             }
-            retTemp += tempVal;
-            retVal = retTemp.split(TokenLineSplit);
+            if (tempStrippedVal.length() > 0) {
+              //save the current line
+                retVal += TokenLineSplit + tempVal.trim();
+            }
         } else
-            retVal = stringToArray(messageLine);
-        return retVal;
+            retVal = messageLine;
+        
+        if (retVal.length() >= TokenLineSplit.length())
+            if (retVal.substring(0,TokenLineSplit.length()).equals(TokenLineSplit))
+                retVal = retVal.substring(TokenLineSplit.length());
+
+        return (retVal.split(TokenLineSplit));
     }
     /**
      * Output the message to the console with the plugin name prepended to it.
@@ -896,10 +999,10 @@ public class HelpCenter extends JavaPlugin {
                         item = subHelps[X];
                         if (item != "") {
                             wrapData = lineWrap(item);
-                            if (wrapData.length > 1)
-                                sendToPlayer(who, null, wrapData, topic);
-                            else
+                            if (wrapData.length == 1 || who == null)
                                 sendToPlayer(who, item, null, topic);
+                            else
+                                sendToPlayer(who, null, wrapData, topic);
                         }
                     }
                 }
@@ -913,20 +1016,18 @@ public class HelpCenter extends JavaPlugin {
                     item = helps[X];
                     if (item != "") {
                         wrapData = lineWrap(item);
-                        if (wrapData.length == 1) {
+                        if (wrapData.length == 1 || who == null)
                             sendToPlayer(who, item, null, topic);
-                        } else {
+                        else
                             sendToPlayer(who, null, wrapData, topic);
-                        }
                     }
                 }
             } else {
                 wrapData = lineWrap(helpData);
-                if (wrapData.length == 1) {
+                if (wrapData.length == 1 || who == null)
                     sendToPlayer(who, helpData, null, topic);
-                } else {
+                else
                     sendToPlayer(who, null, wrapData, topic);
-                }
             }
         }
     }
@@ -944,7 +1045,7 @@ public class HelpCenter extends JavaPlugin {
      */
     private static void sendToPlayer(Player player, String item, String[] multi, String topic) {
         // convert a single statement into a multi-line statment with only one
-        // line so we don't duplicate code below.
+        // line so we don't duplicate code below. 
         if (multi == null)
             multi = stringToArray(item);
         // Output the help lines
@@ -969,30 +1070,5 @@ public class HelpCenter extends JavaPlugin {
      */
     private static String[] stringToArray(String line) {
         return (line.concat(TokenLineSplit).split(TokenLineSplit));
-    }
-        
-    /******************************************
-     * Possibly unused functions
-     ******************************************/
-    public static class Dir implements FileFilter {
-        private final String[] fileEx = new String[] { "txt" };
-
-        static File[] getFiles(File path) {
-            File files[];
-            FileFilter filter = null;
-            files = path.listFiles(filter);
-            Arrays.sort(files);
-            return (files);
-        }
-
-        @Override
-        public boolean accept(File file) {
-            for (String extension : fileEx) {
-                if (file.getName().toLowerCase().endsWith(extension)) {
-                    return true;
-                }
-            }
-            return false;
-        }
     }
 }
