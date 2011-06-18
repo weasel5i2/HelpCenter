@@ -1,0 +1,16 @@
+&ePlayer Information:
+&e---------------------
+%&fuser% = %user%
+%&fworld% = %world%
+%&fhealth% = %health%
+%&farmor% = %armor%
+(%&flocx%,%&flocy%,%&flocz%) = (%locx%,%locy%,%locz%)
+%&fiteminhandid%, %&fiteminhand% = %iteminhandid%, %iteminhand%
+%&fisop% = %isop%
+%&fgroups% = %groups%
+%&fprigroup% = %prigroup%
+&eServer Information:
+&e---------------------
+%&fserveronlinecount% = %serveronlinecount%
+%&fserverver% = %serverver%
+%&fhelpver% = %helpver%

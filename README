@@ -1,4 +1,8 @@
 Changelog:
+version 1.8.0 17-June-2011
+    * Fixed error in determining what Permissions version was installed and choosing the wrong one.
+    * added command to show versions of installed plugins.  /helpp pluginversions
+    * added commands to show the items that bukkit recognizes  /helpitem <filter>
 version 1.78 13-June-2011
     * Fixed issue where long line without spaces was not displayed to user in console or ingame and caused the game to crash after a short while.
     
