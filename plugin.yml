@@ -1,6 +1,6 @@
 name: HelpCenter
 main: net.weasel.HelpCenter.HelpCenter
-version: 1.78
+version: 1.8.0
 authors:
   - weasel5i2
   - The_Nut
@@ -12,6 +12,9 @@ commands:
   helpp:
     description: Help from Plugins. This will get the help information directly from the installed plugins. It will not reference the physical files.
     usage: /<command> <pluginName> <pluginCommand>
+  helpitem:
+    description: Displays a list of items that are recognized by bukkit with their ID.
+    usage: /<command> <filter> Show all items recognized by bukkit. If <filter> is specified, it will only show ones where the filter is in either the ID, name, or category(block, item).
   buildHelpFiles:
     description: This will build a standard set of help files for all installed plugins as based on their plugin.yml file. There are no parameters.
     usage: /help <command>
