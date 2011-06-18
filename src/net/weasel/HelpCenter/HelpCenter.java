@@ -97,6 +97,11 @@ public class HelpCenter extends JavaPlugin {
                             contents = getHelpDirect(args[0], null);
                     else
                         contents = getHelpDirect(null, null);
+                else if (pCommand.equals("helpitem"))
+                    if (args.length >= 1)
+                        contents = getHelpDirectItem(args[0].toLowerCase());
+                    else
+                        contents = getHelpDirectItem("");
                 else if (args.length > 0)
                     if ((args[0].toLowerCase().equals("buildhelpfiles")))
                         contents = buildHelpFiles((Player) sender);
@@ -437,7 +442,7 @@ public class HelpCenter extends JavaPlugin {
             //get player specific permission variables
             if (HelpCenter.Permissions != null) {
                 try {
-                    if (PermissionsVersion.substring(0,1) == "2") {
+                    if (PermissionsVersion.substring(0,1).equals("2")) {
                         //Handle the Permissions 2.x style permission groups
                         playerGroups = HelpCenter.Permissions.getGroups(location.getWorld().getName(), player)[0].toString();
                         playerGroups.replace(" ", "").replace("/", "").replace(".", "");                        
@@ -580,7 +585,8 @@ public class HelpCenter extends JavaPlugin {
         PluginManager pluginManager = getServer().getPluginManager();
         Plugin[] plugins = pluginManager.getPlugins();
         String retValue = "";
-        if (pluginName != null) {
+        String pluginVersion = "";
+        if (pluginName != null && !pluginName.toLowerCase().equals("pluginversions")) {
             Plugin plugin = null;
             for (Plugin tempPlugin : plugins) {
                 if (tempPlugin.getDescription().getName().toLowerCase().equals(pluginName.toLowerCase())) { 
@@ -591,15 +597,15 @@ public class HelpCenter extends JavaPlugin {
             if (plugin != null) {
                 Map<String, Object> commands = (Map<String, Object>)plugin.getDescription().getCommands();
                 if(commands != null) {
+                    pluginVersion = plugin.getDescription().getVersion();
                     if (pluginCommand == null) {
                         String description = plugin.getDescription().getDescription();
-                        String version = plugin.getDescription().getVersion();
-                        retValue += "&e" + pluginName + " " + version + "\n"
-                        + "&e--------------------\n";
-                        if (description != null) retValue += "&eDescription: &f" + description + "\n";                          // Add the description
-                        retValue += "&eAvailable commands:\n"
-                                  + "&e---------------------\n"
-                                  + "&e(type '&f/helpp " + pluginName + " <command>&e' for more info)\n"
+                        retValue += "&e" + pluginName + " v" + pluginVersion + ": Available Commands\n"
+                                  + "&e--------------------\n";
+                        if (description != null) 
+                            retValue += "&eDescription: &f" + description + "\n"                            // Add the description
+                                      + "&e---------------------\n";
+                        retValue += "&e(type '&f/helpp " + pluginName + " <command>&e' for more info)\n"
                                   + "&f";
                         //loop through each command available
                         for (String command : commands.keySet()) {
@@ -612,7 +618,7 @@ public class HelpCenter extends JavaPlugin {
                             String usage = (String) helpCommand.get("usage");                                       //get the usage
                             ArrayList<String> aliases = (ArrayList<String>)helpCommand.get("aliases");              //get the aliases
         
-                            retValue += "&e" + pluginCommand + "\n"
+                            retValue += "&e" + pluginName + " v" + pluginVersion + ": " + pluginCommand + "\n"
                                       + "&e--------------------\n";
                             
                             if (description != null) retValue += "&eDescription: &f" + description + "\n";                          // Add the description
@@ -633,14 +639,24 @@ public class HelpCenter extends JavaPlugin {
             }
         } else {
             //create the header
-            retValue = "&eAvailable Plugins:\n"
+            retValue = "&eBukkit v" + doStringTokenReplacements(null, "%serverver%") + ": Available Plugins\n"
                      + "&e---------------------\n"
                      + "&e(type '&f/helpp <plugin>&e' for more info)\n"
                      + "&e";
+            boolean showVersions = false;
+            if (pluginName != null)
+                if (pluginName.toLowerCase().equals("pluginversions"))
+                    showVersions = true;
+
             // Loop through each plugin we can find.
             for (Plugin plugin : plugins) {
                 pluginName = plugin.getDescription().getName();
-                retValue += pluginName + " ";
+                pluginVersion = plugin.getDescription().getVersion();
+                if (showVersions) {
+                    retValue += pluginName + " v" + pluginVersion + "\n";
+                } else {
+                    retValue += pluginName + " ";
+                }
             }
         }
         return (retValue);
@@ -657,15 +673,20 @@ public class HelpCenter extends JavaPlugin {
     private String getHelpDirectItem(String itemName) {
         String partialRetValue = "";
         String retValue = "";
+        String itemType = "";
         boolean itemShowFlag = false;
         Material[] items = Material.values();
+        retValue = "&eBukkit v" + doStringTokenReplacements(null, "%serverver%") + ": Known Items" + (itemName.equals("") ? "" : " filtered by: " + itemName) + "\n"
+                 + "&e--------------------\n";
+///        
         for (Material item : items) {
-            itemShowFlag = (Integer.toString(item.getId()).contains(itemName) || item.toString().toLowerCase().contains(itemName) ? true : false);
+            itemType = (item.getId() < 256 ? "block - " : "item - ");
+            itemShowFlag = (itemName.equals("") || itemType.contains(itemName) || Integer.toString(item.getId()).contains(itemName) || item.toString().toLowerCase().contains(itemName) ? true : false);
             partialRetValue = "";
-            if (item.getData() == null)
+            if (item.getData() == null) {
                 if (itemShowFlag)
-                    partialRetValue = item.getId() + " - " + item.toString() + "\n";
-            else {
+                    partialRetValue = itemType + item.getId() + " - " + item.toString() + "\n";
+            } else {
                 switch (item) {
                     case SAPLING:
                     case LOG:
@@ -674,7 +695,7 @@ public class HelpCenter extends JavaPlugin {
                         partialRetValue = "";
                         for (TreeSpecies specie : species) 
                             if (itemShowFlag || Integer.toString(specie.getData()).contains(itemName) || specie.toString().toLowerCase().contains(itemName))
-                                partialRetValue += item.getId() + ":" + specie.getData() + " - " + item.toString() + " (" + specie.toString() + ")\n";
+                                partialRetValue += itemType + item.getId() + ":" + specie.getData() + " - " + item.toString() + " (" + specie.toString() + ")\n";
                         break;
                     case WOOL:
                     case INK_SACK:
@@ -683,41 +704,41 @@ public class HelpCenter extends JavaPlugin {
                         if (item == Material.WOOL) {
                             for (DyeColor color : colors)
                                 if (itemShowFlag || Integer.toString(color.getData()).contains(itemName) || color.toString().toLowerCase().contains(itemName))
-                                    partialRetValue += item.getId() + ":" + color.getData() + " - " + item.toString() + " (" + color.toString() + ")\n";
+                                    partialRetValue += itemType + item.getId() + ":" + color.getData() + " - " + item.toString() + " (" + color.toString() + ")\n";
                         } else {
                             String tempRetValue = "";
                             for (DyeColor color : colors) 
                                 if (itemShowFlag || Integer.toString(color.getData()).contains(itemName) || color.toString().toLowerCase().contains(itemName))
-                                    tempRetValue = item.getId() + ":" + (15 - color.getData()) + " - " + item.toString() + " (" + color.toString() + ")\n" + tempRetValue;
+                                    tempRetValue = itemType + item.getId() + ":" + (15 - color.getData()) + " - " + item.toString() + " (" + color.toString() + ")\n" + tempRetValue;
                             partialRetValue += tempRetValue;
                         }
                         break;
                     case DOUBLE_STEP:
                     case STEP:
-                        partialRetValue = (itemShowFlag || "0".contains(itemName) || "STONE".contains(itemName)       ? item.getId() + ":0 - " + item.toString() + " (STONE)\n" : "") +
-                                          (itemShowFlag || "1".contains(itemName) || "SANDSTONE".contains(itemName)   ? item.getId() + ":1 - " + item.toString() + " (SANDSTONE)\n" : "") +
-                                          (itemShowFlag || "2".contains(itemName) || "WOOD".contains(itemName)        ? item.getId() + ":2 - " + item.toString() + " (WOOD)\n" : "") +
-                                          (itemShowFlag || "3".contains(itemName) || "COBBLESTONE".contains(itemName) ? item.getId() + ":3 - " + item.toString() + " (COBBLESTONE)\n" : "") ;
+                        partialRetValue = (itemShowFlag || "0".contains(itemName) || "stone".contains(itemName)       ? itemType + item.getId() + ":0 - " + item.toString() + " (STONE)\n" : "") +
+                                          (itemShowFlag || "1".contains(itemName) || "sandstone".contains(itemName)   ? itemType + item.getId() + ":1 - " + item.toString() + " (SANDSTONE)\n" : "") +
+                                          (itemShowFlag || "2".contains(itemName) || "wood".contains(itemName)        ? itemType + item.getId() + ":2 - " + item.toString() + " (WOOD)\n" : "") +
+                                          (itemShowFlag || "3".contains(itemName) || "cobblestone".contains(itemName) ? itemType + item.getId() + ":3 - " + item.toString() + " (COBBLESTONE)\n" : "") ;
                         break;
                     case COAL:
                         CoalType[] coaltypes = CoalType.values();
                         partialRetValue = "";
                         for (CoalType coaltype : coaltypes) 
                             if (itemShowFlag || Integer.toString(coaltype.getData()).contains(itemName) || coaltype.toString().toLowerCase().contains(itemName))
-                                partialRetValue += item.getId() + ":" + coaltype.getData() + " - " + item.toString() + " (" + coaltype.toString() + ")\n";
+                                partialRetValue += itemType + item.getId() + ":" + coaltype.getData() + " - " + item.toString() + " (" + coaltype.toString() + ")\n";
                         break;
                     //Uncomment for future release when LONG_GRASS exists
                     //case LONG_GRASS:
                     //    GrassSpecies[] species = GrassSpecies.values();
                     //    for (GrassSpecies specie : species) 
                     //        if (specie.getData() == 0)
-                    //            partialRetValue += item.getId() + ":0 - " + item.toString() + "\n";
+                    //            partialRetValue += itemType + item.getId() + ":0 - " + item.toString() + "\n";
                     //        else
-                    //            partialRetValue += item.getId() + ":" + specie.getData() + " - " + specie.toString() + "_" + item.toString() + "\n";
+                    //            partialRetValue += itemType + item.getId() + ":" + specie.getData() + " - " + specie.toString() + "_" + item.toString() + "\n";
                     //    break;
                     default:
                         if (itemShowFlag)
-                            partialRetValue = item.getId() + " - " + item.toString() + "\n";
+                            partialRetValue = itemType + item.getId() + " - " + item.toString() + "\n";
                 }
             }
             retValue += partialRetValue;
