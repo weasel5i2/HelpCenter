@@ -1,4 +1,7 @@
 Changelog:
+version 1.8.1 13-Aug-2011
+    * Added recognition of permissionsBukkit 1.1 so %groups% and %prigroup% will get populated the same as before.
+      NOTE: If by chance Permissions and permissionsBukkit are both installed, Permissions will take priority.
 version 1.8.0 17-June-2011
     * Fixed error in determining what Permissions version was installed and choosing the wrong one.
     * added command to show versions of installed plugins.  /helpp pluginversions
