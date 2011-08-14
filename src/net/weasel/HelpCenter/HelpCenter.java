@@ -7,6 +7,7 @@ import java.io.BufferedInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
@@ -31,6 +32,9 @@ import org.bukkit.Location;
 import com.nijiko.permissions.PermissionHandler;
 import com.nijikokun.bukkit.Permissions.Permissions;
 
+import com.platymuus.bukkit.permissions.Group;
+import com.platymuus.bukkit.permissions.PermissionsPlugin; //PermisionsBukkit
+
 import java.net.*;
 
 public class HelpCenter extends JavaPlugin {
@@ -51,6 +55,7 @@ public class HelpCenter extends JavaPlugin {
     private static String TokenLineSplit = "ZQX123!";                       //A unique string used to combine and later split combined lines 
     private static PermissionHandler Permissions;                           //PermissionsHandler object for access to permissions
     private static String PermissionsVersion;                               //Holds the Permissions version number for later use
+    private static PermissionsPlugin PermissionsBukkit;                     //PermissionsPlugin object for access to PermissionsBukkit
     private static long rSeed = java.util.GregorianCalendar.MILLISECOND;    //used for random number generation
     private static Random gen = new java.util.Random(rSeed);                //used to help pick a random line number in a help file
 
@@ -410,6 +415,7 @@ public class HelpCenter extends JavaPlugin {
             String playerGroups = "groups";
             String playerGroup = "prigroup";
         String serverOnlineCount = "serveronlinecount";
+        String serverOnlinePlayers = "serveronlineplayers";
         String serverVersion = "serverver";
         
         //get server variables
@@ -421,8 +427,22 @@ public class HelpCenter extends JavaPlugin {
                 serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-7, serverVersion.indexOf("(MC:")-4);
             else
                 //the build is 4 digits long (hopefully not more)
-                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-8, serverVersion.indexOf("(MC:")-5);
-                
+                serverVersion = serverVersion.substring(serverVersion.indexOf("(MC:")-8, serverVersion.indexOf("(MC:")-4);
+
+        if (Bukkit.getServer().getOnlinePlayers().length > 0) {
+            serverOnlinePlayers = "";
+            Player players[] = Bukkit.getServer().getOnlinePlayers();
+            for (int i = 0; i < players.length; i++) {
+                serverOnlinePlayers = serverOnlinePlayers + players[i].getName().trim() + ",";
+            }
+            //remove trailing comma
+            serverOnlinePlayers = serverOnlinePlayers.substring(0, serverOnlinePlayers.length() - 1);
+        } else 
+            serverOnlinePlayers = "None";
+        
+        
+
+            
         //get player specific variables
         if (who != null) {
             Location location = who.getLocation();
@@ -478,6 +498,32 @@ public class HelpCenter extends JavaPlugin {
                     playerGroups = "";
                     playerGroup = "";
                 }
+            } else if (HelpCenter.PermissionsBukkit != null) {
+                try {
+                    List<Group> groupList = PermissionsBukkit.getPlayerInfo(player).getGroups();
+                    playerGroups = "";
+                    for (Group group : groupList) {
+                        playerGroups += "," + group.getName();
+                    }
+                    //strip off leading comma
+                    if (playerGroups.indexOf(",") != -1) {
+                        playerGroups = playerGroups.substring(1);
+                        //if there is more than one group, then surround in brackets
+                        if (playerGroups.indexOf(",") != -1) {
+                            playerGroups = "[" + playerGroups + "]";
+                        }
+                    }
+                    if (playerGroups.toString().indexOf("[") == -1) {
+                        playerGroup = playerGroups;
+                        playerGroups = "[" + playerGroups + "]";
+                    } else {
+                        playerGroup = playerGroups.replace("[", "");
+                        playerGroup = playerGroup.substring(0, playerGroup.indexOf(","));
+                    }
+                } catch (Exception e) {
+                    playerGroups = "";
+                    playerGroup = "";
+                }
             }
         }
         HelpString = HelpString.replace("%user%", player)
@@ -494,6 +540,7 @@ public class HelpCenter extends JavaPlugin {
                                .replace("%groups%", playerGroups)
                                .replace("%serveronlinecount%", serverOnlineCount)
                                .replace("%serverver%", serverVersion)
+                               .replace("%serveronlineplayers%", serverOnlinePlayers)
                                .replace("%helpver%", pluginVersion);
 
         return HelpString;
@@ -867,10 +914,20 @@ public class HelpCenter extends JavaPlugin {
             if (test != null) {
                 HelpCenter.Permissions = ((Permissions) test).getHandler();
                 HelpCenter.PermissionsVersion = test.getDescription().getVersion();
+                logOutput("Permissions system detected.");
             } else {
-                logOutput("Permission system not detected. '%prigroup%' and '%groups%' will be replaced with 'prigroup' and 'groups'");
+                test = null;
+                test = this.getServer().getPluginManager().getPlugin("PermissionsBukkit");
+                if (test != null) {
+                    HelpCenter.PermissionsBukkit = ((PermissionsPlugin) test);
+                    test.getDescription().getVersion();
+                    logOutput("PermissionsBukkit system detected.");
+                } else {
+                    logOutput("Permission nor PermissionsBukkit system not detected. '%prigroup%' and '%groups%' will be replaced with 'prigroup' and 'groups'");
+                }
             }
         }
+        
     }
     /**
      * Break a message line into multiple lines if the line exceeds 60 characters.
